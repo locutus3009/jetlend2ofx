@@ -1,10 +1,20 @@
+from __future__ import absolute_import, print_function
+
 import pandas
 import argparse as ap
 import numpy as np
+from io import StringIO
+
+import itertools as it
+
+from meza.io import read_csv, IterStringIO
+from csv2ofx import utils
+from csv2ofx.ofx import OFX
+from csv2ofx.mappings.capitalone import mapping
 
 
-# Function to insert row in the dataframe
 def insert_row(row_number, df, row_value):
+    # Function to insert row in the dataframe
     # Starting value of upper half
     start_upper = 0
 
@@ -97,7 +107,25 @@ def main():
     df = df.replace({0: np.nan})
 
     print(df)
-    df.to_csv(args.output, index=False, sep=",", decimal=".")
+
+    # csv = df.to_csv(args.output, index=False, sep=",", decimal=".")
+    csv = df.to_csv(index=False, sep=",", decimal=".")
+    # print(csv)
+    f = StringIO(csv)
+
+    ofx = OFX(mapping)
+    ofx.currency = 'RUB'
+    records = read_csv(f, dedupe=True)
+    groups = ofx.gen_groups(records)
+    trxns = ofx.gen_trxns(groups)
+    cleaned_trxns = ofx.clean_trxns(trxns)
+    data = utils.gen_data(cleaned_trxns)
+    content = it.chain([ofx.header(), ofx.gen_body(data), ofx.footer()])
+
+    with open(args.output, 'wb') as file:
+        for line in IterStringIO(content):
+            file.write(line)
+            file.write(b'\n')
 
 
 if __name__ == '__main__':
