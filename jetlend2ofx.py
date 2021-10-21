@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 
-from __future__ import absolute_import, print_function
+from __future__ import (
+    absolute_import, division, print_function, unicode_literals)
+
+from operator import itemgetter
 
 import pandas
 import argparse as ap
@@ -12,7 +15,20 @@ import itertools as it
 from meza.io import read_csv, IterStringIO
 from csv2ofx import utils
 from csv2ofx.ofx import OFX
-from csv2ofx.mappings.capitalone import mapping
+
+mapping = {
+    'has_header': True,
+    'is_split': False,
+    'bank': 'JetLend',
+    'currency': 'RUB',
+    'delimiter': ',',
+    'account': itemgetter('Card No.'),
+    'date': itemgetter('Posted Date'),
+    'type': lambda tr: 'DEBIT' if tr.get('Debit') else 'CREDIT',
+    'amount': lambda tr: tr.get('Debit') or tr.get('Credit'),
+    'desc': itemgetter('Category'),
+    'payee': itemgetter('Description'),
+}
 
 
 def insert_row(row_number, df, row_value):
@@ -82,7 +98,7 @@ def main():
     df.columns = ['Posted Date', 'Category',
                   'Description', 'Credit', 'Debit', 'Debt', 'Income']
     df['Transaction Date'] = df['Posted Date']
-    df['Card No.'] = 12345
+    df['Card No.'] = 1
 
     cols = df.columns.tolist()
     cols = [cols[7], cols[0], cols[8], cols[2],
@@ -93,22 +109,25 @@ def main():
 
     for index, row in df.iterrows():
         if row['Debt'] != 0:
-            row['Credit'] = row['Debt']
             df.at[index, 'Credit'] = row['Debt']
             df.at[index, 'Debt'] = 0
             df.at[index, 'Category'] = 'contract'
+            df.at[index, 'Description'] = row['Description'] + \
+                ', частичный возврат'
 
     for index, row in df.iterrows():
         if row['Income'] != 0:
             row['Credit'] = row['Income']
             row['Income'] = 0
-            row['Category'] = 'income'
+            row['Category'] = 'dividents'
+            row['Description'] = row['Description'].rsplit(', ', 2)[
+                0] + ', проценты'
             df = insert_row(index, df, row)
 
     df = df.drop(df.columns[[7, 8]], axis=1)
     df = df.replace({0: np.nan})
 
-    print(df)
+    print(df.to_string())
 
     # csv = df.to_csv(args.output, index=False, sep=",", decimal=".")
     csv = df.to_csv(index=False, sep=",", decimal=".")
@@ -116,7 +135,6 @@ def main():
     f = StringIO(csv)
 
     ofx = OFX(mapping)
-    ofx.currency = 'RUB'
     records = read_csv(f, dedupe=True)
     groups = ofx.gen_groups(records)
     trxns = ofx.gen_trxns(groups)
