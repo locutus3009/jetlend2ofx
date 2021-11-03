@@ -109,11 +109,15 @@ def main():
 
     for index, row in df.iterrows():
         if row['Debt'] != 0:
-            df.at[index, 'Credit'] = row['Debt']
             df.at[index, 'Debt'] = 0
             df.at[index, 'Category'] = 'contract'
-            df.at[index, 'Description'] = row['Description'] + \
-                ', частичный возврат'
+            if row['Income'] != 0:
+                df.at[index, 'Credit'] = row['Debt']
+                df.at[index, 'Description'] = row['Description'] + \
+                    ', частичный возврат'
+            else:
+                df.at[index, 'Description'] = row['Description'] + \
+                    ', покупка'
 
     for index, row in df.iterrows():
         if row['Income'] != 0:
