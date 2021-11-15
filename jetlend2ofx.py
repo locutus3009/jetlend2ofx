@@ -118,6 +118,7 @@ def main():
             else:
                 df.at[index, 'Description'] = row['Description'] + \
                     ', покупка'
+                df.at[index, 'Category'] = 'purchase'
 
     for index, row in df.iterrows():
         if row['Income'] != 0:
@@ -127,6 +128,9 @@ def main():
             row['Description'] = row['Description'].rsplit(', ', 2)[
                 0] + ', проценты'
             df = insert_row(index, df, row)
+
+    df = df.drop(df[df.Category == 'payment'].index)
+    df = df.drop(df[df.Category == 'purchase'].index)
 
     df = df.drop(df.columns[[7, 8]], axis=1)
     df = df.replace({0: np.nan})
