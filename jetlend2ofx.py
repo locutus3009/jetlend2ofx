@@ -16,18 +16,31 @@ from meza.io import read_csv, IterStringIO
 from csv2ofx import utils
 from csv2ofx.ofx import OFX
 
+
+def find_type(transaction):
+    amount_credit = float(transaction.get("Credit"))
+    amount_debit = float(transaction.get("Debit"))
+    return "CREDIT" if amount_credit > 0 else "DEBIT"
+
+
+def find_amount(transaction):
+    amount_credit = float(transaction.get("Credit"))
+    amount_debit = float(transaction.get("Debit"))
+    return amount_credit if amount_credit > 0 else amount_debit
+
+
 mapping = {
-    'has_header': True,
-    'is_split': False,
-    'bank': 'JetLend',
-    'currency': 'RUB',
-    'delimiter': ',',
-    'account': itemgetter('Card No.'),
-    'date': itemgetter('Posted Date'),
-    'type': lambda tr: 'DEBIT' if tr.get('Debit') else 'CREDIT',
-    'amount': lambda tr: tr.get('Debit') or tr.get('Credit'),
-    'desc': itemgetter('Category'),
-    'payee': itemgetter('Description'),
+    "has_header": True,
+    "is_split": False,
+    "bank": "JetLend",
+    "currency": "RUB",
+    "delimiter": ",",
+    "account": itemgetter("Card No."),
+    "date": itemgetter("Posted Date"),
+    "type": find_type,
+    "amount": find_amount,
+    "desc": itemgetter("Description"),
+    "payee": itemgetter("Description"),
 }
 
 
@@ -133,13 +146,11 @@ def main():
     df = df.drop(df[df.Category == 'purchase'].index)
 
     df = df.drop(df.columns[[7, 8]], axis=1)
-    df = df.replace({0: np.nan})
 
     print(df.to_string())
 
     # csv = df.to_csv(args.output, index=False, sep=",", decimal=".")
     csv = df.to_csv(index=False, sep=",", decimal=".")
-    # print(csv)
     f = StringIO(csv)
 
     ofx = OFX(mapping)
